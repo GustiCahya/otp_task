@@ -29,15 +29,6 @@ export default function OTPApp() {
   };
 
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .then((reg) => console.log('Service Worker registered with scope:', reg.scope))
-        .catch((err) => console.error('Service Worker registration failed:', err));
-    }
-  }, []);
-
-  useEffect(() => {
     fetchStatus();
     // Poll status every second if blocked to update cooldown visually, though the instruction says "On every page load, read current status".
     // We can just update it after actions, but a live cooldown on block is nice.
