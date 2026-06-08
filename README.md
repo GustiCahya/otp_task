@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🔒 Secure OTP Auth & Rate Limiter
 
-## Getting Started
+A state-of-the-art, secure single-page application for One-Time Password (OTP) request and verification. Built with **Next.js (App Router)** and **TypeScript**, utilizing high-performance server-side actions, in-memory state tracking, and a sliding-window rate limiter, all with **zero third-party libraries for core logic**.
 
-First, run the development server:
+The interface is styled using custom, modern **Vanilla CSS**, featuring a premium glassmorphic dashboard, micro-animations, active visual timers, and dynamic audit history tracking.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 Key Features
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Core Requirements
+1. **Request OTP Server Action**
+   - Implements a server-side **sliding-window rate limiter** restricting requests to a maximum of **3 requests per 60 seconds**.
+   - Generates a cryptographically randomized 6-digit OTP code with a 2-minute server-side expiration window.
+2. **Verify OTP Server Action**
+   - Validates OTP submission against the server-side store.
+   - Rejects expired codes, already-used codes, or incorrect codes with precise, descriptive error messages.
+3. **Status Tracking & Live Sync**
+   - Fetches and displays current user status (attempts used, remaining attempts, block cooldown seconds).
+4. **Premium Vanilla CSS Interface**
+   - Sleek dashboard design with fluid states, glow effects, responsive spacing, and loading indicators.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 🌟 Bonus Achievements Implemented
+- **Bonus 1 — Live Client-Side Expiry Countdown**: A real-time visual countdown using the server's `expiresAt` timestamp as the single source of truth.
+- **Bonus 2 — Self-Cleaning In-Memory Store**: A garbage collector routine (`clearExpired`) runs automatically before each request to prune old rate-limit timestamps and stale/used OTPs to prevent memory leaks.
+- **Bonus 3 — Per-Attempt Audit Log**: Records a detailed trail of actions (`request`, `verify`) and their results (`allowed`, `blocked`, `success`, `expired`, `not_found`, etc.), rendered as an interactive history log in the UI.
+- **Bonus 4 — Max Verification Fail-Safe**: Automatically invalidates an OTP after **3 failed verification attempts**, immediately transitioning its state to `max_attempts_exceeded` to block brute-force attacks.
+- **Bonus 5 — Unit Test Suite**: Comprehensive tests built with **Vitest** utilizing mock timers to validate edge cases (expiration, rate limits, audit logging, incorrect codes, brute-force invalidation).
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 📂 Project Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [`src/store.ts`](./src/store.ts): Server-side in-memory singleton storing rate limit stamps, active OTPs, and the audit logs.
+- [`src/actions/otp.ts`](./src/actions/otp.ts): Server Actions managing request authorization, sliding-window rate checks, verification logic, and status loaders.
+- [`src/app/page.tsx`](./src/app/page.tsx): Main interactive client dashboard utilizing real-time countdown hooks, polling, and action calls.
+- [`src/app/globals.css`](./src/app/globals.css): Premium CSS stylesheet defining variables, layout grids, glassmorphism card styling, responsive design rules, and micro-animations.
+- [`__tests__/otp.test.ts`](./__tests__/otp.test.ts): Unit test coverage using Vitest.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 🛠️ Tech Stack & Setup
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Core**: Next.js 16 (App Router), React 19, TypeScript
+- **Styling**: Vanilla CSS (CSS Variables, Flexbox/Grid layouts, Glassmorphic effects, CSS Transitions)
+- **Testing**: Vitest
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Prerequisites
+Make sure you have [Node.js](https://nodejs.org/) installed (v18+ recommended).
+
+### Installation & Run
+
+1. Clone or navigate to the project root:
+   ```bash
+   cd otp_task
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Run the development server:
+   ```bash
+   npm run dev
+   ```
+   Open [http://localhost:3000](http://localhost:3000) to view the application in your browser.
+
+4. Run the unit test suite:
+   ```bash
+   npx vitest run
+   ```
+
+---
+
+## ⚙️ Technical Details & Constraints
+
+### Sliding Window Rate Limiter
+The rate limiter operates by tracking the Unix timestamps of successful requests. When a request is received:
+1. `clearExpired(userId)` cleans timestamps older than 60 seconds from the memory store.
+2. If the count of remaining timestamps in the current window is $\ge 3$, the request is blocked, and the `waitSeconds` are calculated as:
+   $$\text{waitSeconds} = \left\lceil \frac{\text{oldestAttempt} + 60\,000 - \text{now}}{1,000} \right\rceil$$
+3. Otherwise, the current timestamp is appended, and a new OTP is issued.
+
+### Bruteforce Prevention
+Each OTP generated tracks `failedAttempts: number`. If verification fails, we increment this counter on the active OTP. Once it reaches 3, the OTP is instantly locked out and marked as `max_attempts_exceeded`.
+
+### Server-Side Isolation
+The `store` object inside `store.ts` is a module-level variable that is never exported or serialized. All data mutations and validations occur strictly server-side inside Next.js Server Actions, keeping the OTP and validation status hidden from client injection.
